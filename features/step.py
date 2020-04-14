@@ -101,7 +101,8 @@ class FeaturesComputer(GenericStep):
         if self.producer:
             out_message = {
                 "oid": oid,
-                "features": result
+                "features": result,
+                "candid": self.message["candid"]
             }
             self.producer.produce(out_message)
 

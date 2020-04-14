@@ -4,11 +4,12 @@
 import os
 FEATURE_VERSION = "v0.1"
 
-CONSUMER_CONFIG = {"TOPICS": [os.getenv("CONSUMER_TOPICS")],
-                   "PARAMS": {
-    'bootstrap.servers': os.getenv("CONSUMER_SERVER"),
-    'group.id': os.getenv("CONSUMER_GROUP_ID")
-}
+CONSUMER_CONFIG = {
+    "TOPICS": [os.getenv("CONSUMER_TOPICS")],
+    "PARAMS": {
+        'bootstrap.servers': os.getenv("CONSUMER_SERVER"),
+        'group.id': os.getenv("CONSUMER_GROUP_ID")
+    }
 }
 DB_CONFIG = {
     "PSQL": {
@@ -35,6 +36,7 @@ PRODUCER_CONFIG = {
         'type': 'record',
         'fields': [
             {'name': 'oid', 'type': 'string'},
+            {'name': 'candid', 'type': 'string'},
             {'name': 'features', 'type': {
                 'type': 'map',
                 'values': ['float', 'int', 'string', 'null']
