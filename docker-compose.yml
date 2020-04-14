@@ -4,13 +4,17 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    restart: "always"
+    network_mode: host
+    # restart: "always"
+    volumes:
+      - ".:/app"
     env_file:
       - db_settings.env
       - es_settings.env
     environment:
-      - CONSUMER_TOPICS=correction-test
-      - CONSUMER_SERVER=kafka.alerce.online:9092
-      - CONSUMER_GROUP_ID=test-features
-      - PRODUCER_TOPIC=features-test
-      - PRODUCER_SERVER=kafka.alerce.online:9092
+      - CONSUMER_TOPICS=correction
+      - CONSUMER_SERVER=localhost:9092
+      - CONSUMER_GROUP_ID=features
+      - PRODUCER_TOPIC=features
+      - PRODUCER_SERVER=localhost:9092
+      - LOGGING_DEBUG=True
