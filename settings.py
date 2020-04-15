@@ -38,7 +38,12 @@ PRODUCER_CONFIG = {
                 'type': 'map',
                 'values': ['float', 'int', 'string', 'null']
             }
-            }
+            },
+            {'name': 'timestamp_sent', 'type': {
+                'type': 'long',
+                'logicalType': 'timestamp-millis'
+            }},
+            {'name': 'flag', 'type': 'boolean'}
         ]
     }
 }

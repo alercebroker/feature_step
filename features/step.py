@@ -32,10 +32,12 @@ class FeaturesComputer(GenericStep):
         Other args passed to step (DB connections, API requests, etc.)
 
     """
+
     def __init__(self, consumer=None, config=None, level=logging.INFO, **step_args):
         super().__init__(consumer, config=config, level=level)
         self.preprocessor = DetectionsPreprocessorZTF()
-        self.featuresComputer = CustomHierarchicalExtractor()#HierarchicalExtractor([1, 2])
+        # HierarchicalExtractor([1, 2])
+        self.featuresComputer = CustomHierarchicalExtractor()
         self.session = get_session(self.config["DB_CONFIG"])
 
         prod_config = self.config.get("PRODUCER_CONFIG", None)
@@ -68,46 +70,54 @@ class FeaturesComputer(GenericStep):
         detections.index.name = "oid"
         detections = self.preprocessor.preprocess(detections)
         non_detections = json_normalize(message["non_detections"])
+        flag = False
         if len(detections) < 6:
             self.logger.debug(f"{oid} Object has less than 6 detections")
-            return
+            flag = True
+            result = {}
         else:
             self.logger.debug(f"{oid} Object has enough detections")
             self.logger.debug("Calculating Features")
-        features_t0 = time.time()
-        features = self.featuresComputer.compute_features(detections, non_detections=non_detections)
-        features.replace([np.inf, -np.inf], np.nan, inplace=True)
-        features = features.astype(float)
-        features_t1 = time.time()
-        if len(features) > 0:
-            if type(features) is pd.Series:
-                features = pd.DataFrame([features])
-            result = self._clean_result(features.loc[oid].to_dict())
-        else:
-            self.logger.debug(f"No features for {oid}")
-            return
+        if not flag:
+            features_t0 = time.time()
+            features = self.featuresComputer.compute_features(
+                detections, non_detections=non_detections)
+            features.replace([np.inf, -np.inf], np.nan, inplace=True)
+            features = features.astype(float)
+            features_t1 = time.time()
+            if len(features) > 0:
+                if type(features) is pd.Series:
+                    features = pd.DataFrame([features])
+                result = self._clean_result(features.loc[oid].to_dict())
+            else:
+                self.logger.debug(f"No features for {oid}")
+                flag = True
+                result = {}
 
-        obj, created = get_or_create(self.session, AstroObject, filter_by={"oid": oid})
-        version, created = get_or_create(self.session, Features, filter_by={"version": self.config["FEATURE_VERSION"]})
-        features, created = get_or_create(self.session, FeaturesObject, filter_by={
-            "features_version": self.config["FEATURE_VERSION"], "object_id": oid
-        })
+        if not flag:
+            obj, created = get_or_create(
+                self.session, AstroObject, filter_by={"oid": oid})
+            version, created = get_or_create(self.session, Features, filter_by={
+                                             "version": self.config["FEATURE_VERSION"]})
+            features, created = get_or_create(self.session, FeaturesObject, filter_by={
+                "features_version": self.config["FEATURE_VERSION"], "object_id": oid
+            })
 
-        features.data = result
-        features.features = version
-        obj.features.append(features)
-        self.session.commit()
+            features.data = result
+            features.features = version
+            obj.features.append(features)
+            self.session.commit()
 
         if self.producer:
             out_message = {
                 "oid": oid,
                 "features": result,
-                "candid": self.message["candid"]
+                "candid": self.message["candid"],
+                "timestamp_sent": datetime.datetime.now(datetime.timezone.utc),
+                "flag": flag
             }
+            self.metrics["timestamp_sent"] = out_message["timestamp_sent"]
+            self.metrics["has_features"] = not flag
+            self.metrics["oid"] = oid
             self.producer.produce(out_message)
 
-        compute_time = features_t1-features_t0
-        wall_time = time.time()-t0
-
-        self.send_metrics(oid=oid, compute_time=compute_time)
-        self.logger.info(f"object={oid}\tdate={datetime.datetime.now()}\tcompute_time={compute_time:.6f}\twall_time={wall_time:.6f}")
