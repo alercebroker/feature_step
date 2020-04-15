@@ -8,9 +8,6 @@ services:
     # restart: "always"
     volumes:
       - ".:/app"
-    env_file:
-      - db_settings.env
-      - es_settings.env
     environment:
       - CONSUMER_TOPICS=correction
       - CONSUMER_SERVER=localhost:9092
