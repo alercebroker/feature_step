@@ -104,7 +104,16 @@ This step require only consumer.
           "null"
         ]
       }
-    }
+    },
+    {"name": "oid", "type": "string"},
+    {"name": "candid", "type": "string"},
+    {"name": "timestamp_sent", 
+      "type": {
+        "type": "long",
+        "logicalType": "timestamp-millis"
+      }
+    },
+    {"name": "flag", "type": "boolean"}
   ]
 }
 ```
