@@ -17,8 +17,8 @@ DB_CONFIG = {
 CONSUMER_CONFIG = {
     "TOPICS": os.environ["CONSUMER_TOPICS"].strip().split(","),
     "PARAMS": {
-         "bootstrap.servers": os.environ["CONSUMER_SERVER"],
-         "group.id": os.environ["CONSUMER_GROUP_ID"]
+        "bootstrap.servers": os.environ["CONSUMER_SERVER"],
+        "group.id": os.environ["CONSUMER_GROUP_ID"]
     }
 }
 
@@ -39,10 +39,49 @@ PRODUCER_CONFIG = {
                 'values': ['float', 'int', 'string', 'null']
             }
             },
-            {'name': 'timestamp_sent', 'type': {
-                'type': 'long',
-                'logicalType': 'timestamp-millis'
-            }},
+            {
+                "name": "metrics",
+                "type": {
+                    "name": "metrics",
+                    "type": "record",
+                    "fields": [
+                        {
+                            "name": "correction",
+                            "type": {
+                                "name": "correction",
+                                "type": "record",
+                                "fields": [
+                                    {
+                                        "name": "timestamp_received",
+                                        "type": {'type': 'long', 'logicalType': 'timestamp-millis'}
+                                    },
+                                    {
+                                        "name": "timestamp_sent",
+                                        "type": {'type': 'long', 'logicalType': 'timestamp-millis'}
+                                    }
+                                ]
+                            }
+                        },
+                        {
+                            "name": "features_metrics",
+                            "type": {
+                                "name": "features_metrics",
+                                "type": "record",
+                                "fields": [
+                                    {
+                                        "name": "timestamp_received",
+                                        "type": {'type': 'long', 'logicalType': 'timestamp-millis'}
+                                    },
+                                    {
+                                        "name": "timestamp_sent",
+                                        "type": {'type': 'long', 'logicalType': 'timestamp-millis'}
+                                    }
+                                ]
+                            }
+                        }
+                    ]
+                }
+            },
             {'name': 'flag', 'type': 'boolean'}
         ]
     }
@@ -57,7 +96,7 @@ ES_CONFIG = {
 STEP_CONFIG = {
     "CONSUMER_CONFIG": CONSUMER_CONFIG,
     "DB_CONFIG": DB_CONFIG,
-    "ES_CONFIG": ES_CONFIG,
+#    "ES_CONFIG": ES_CONFIG,
     "PRODUCER_CONFIG": PRODUCER_CONFIG,
     "FEATURE_VERSION": FEATURE_VERSION,
     "COMMIT": False

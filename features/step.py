@@ -59,6 +59,7 @@ class FeaturesComputer(GenericStep):
         return cleaned_results
 
     def execute(self, message):
+        timestamp_received = datetime.datetime.now(datetime.timezone.utc)
         t0 = time.time()
         oid = message["oid"]
         detections = json_normalize(message["detections"])
@@ -109,15 +110,16 @@ class FeaturesComputer(GenericStep):
             self.session.commit()
 
         if self.producer:
+            message["metrics"]["features_metrics"] = {
+                "timestamp_received": timestamp_received,
+                "timestamp_sent": datetime.datetime.now(datetime.timezone.utc)
+            } 
             out_message = {
                 "oid": oid,
                 "features": result,
                 "candid": self.message["candid"],
-                "timestamp_sent": datetime.datetime.now(datetime.timezone.utc),
+                "metrics": message["metrics"],
                 "flag": flag
             }
-            self.metrics["timestamp_sent"] = out_message["timestamp_sent"]
-            self.metrics["has_features"] = not flag
-            self.metrics["oid"] = oid
             self.producer.produce(out_message)
 
