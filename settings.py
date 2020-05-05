@@ -58,6 +58,10 @@ PRODUCER_CONFIG = {
                                     {
                                         "name": "timestamp_sent",
                                         "type": {'type': 'long', 'logicalType': 'timestamp-millis'}
+                                    },
+                                    {
+                                        "name": "candid",
+                                        "type": "string"
                                     }
                                 ]
                             }
