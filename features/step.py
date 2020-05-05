@@ -113,7 +113,7 @@ class FeaturesComputer(GenericStep):
             message["metrics"]["features_metrics"] = {
                 "timestamp_received": timestamp_received,
                 "timestamp_sent": datetime.datetime.now(datetime.timezone.utc),
-                "candid": message["candid"]
+                "candid": str(message["candid"])
             } 
             out_message = {
                 "oid": oid,
