@@ -112,7 +112,8 @@ class FeaturesComputer(GenericStep):
         if self.producer:
             message["metrics"]["features_metrics"] = {
                 "timestamp_received": timestamp_received,
-                "timestamp_sent": datetime.datetime.now(datetime.timezone.utc)
+                "timestamp_sent": datetime.datetime.now(datetime.timezone.utc),
+                "candid": message["candid"]
             } 
             out_message = {
                 "oid": oid,
