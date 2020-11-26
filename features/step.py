@@ -258,6 +258,7 @@ class FeaturesComputer(GenericStep):
         for oid, features_oid in features.iterrows():
             features_oid.replace({np.nan: None}, inplace=True)
             candid = alert_data.loc[oid].candid
+            candid = candid if type(candid) is not pd.Series else candid.values[-1]
             features_dict = features_oid.to_dict()
             out_message = {"features": features_dict, "oid": oid, "candid": candid}
             self.producer.produce(out_message, key=oid)
