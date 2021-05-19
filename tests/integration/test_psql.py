@@ -1,10 +1,7 @@
 import unittest
 from unittest import mock
-import subprocess
-import time
 from features.step import (
     FeaturesComputer,
-    CustomStreamHierarchicalExtractor,
     KafkaProducer,
     pd,
     np,
@@ -44,7 +41,7 @@ class PSQLIntegrationTest(unittest.TestCase):
         self.mock_custom_hierarchical_extractor = mock.create_autospec(FeaturesComputer)
         self.step = FeaturesComputer(
             config=self.step_config,
-            features_computer=self.mock_custom_hierarchical_extractor,
+            feature_extractor=self.mock_custom_hierarchical_extractor,
             producer=self.mock_producer,
             test_mode=True,
         )

@@ -23,7 +23,7 @@ CONSUMER_CONFIG = {
     "PARAMS": {
         "bootstrap.servers": os.environ["CONSUMER_SERVER"],
         "group.id": os.environ["CONSUMER_GROUP_ID"],
-        "auto.offset.reset":"beginning",
+        "auto.offset.reset": "beginning",
         "max.poll.interval.ms": 3600000, 
         "enable.partition.eof": os.getenv("ENABLE_PARTITION_EOF", False),
     },
@@ -50,7 +50,7 @@ METRICS_CONFIG = {
     "PARAMS": {
         "PARAMS": {
             "bootstrap.servers": os.environ["METRICS_HOST"],
-            "auto.offset.reset":"smallest"},
+            "auto.offset.reset": "smallest"},
         "TOPIC": os.environ["METRICS_TOPIC"],
         "SCHEMA": {
             "$schema": "http://json-schema.org/draft-07/schema",

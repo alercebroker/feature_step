@@ -1,4 +1,3 @@
-import time
 import logging
 import datetime
 import warnings
@@ -8,12 +7,15 @@ import pandas as pd
 from apf.core.step import GenericStep
 from apf.producers import KafkaProducer
 from db_plugins.db.sql import SQLConnection
-from db_plugins.db.sql.models import FeatureVersion, Object, Feature, Step
+from db_plugins.db.sql.models import FeatureVersion, Feature, Step
 
-from lc_classifier.features.custom import CustomStreamHierarchicalExtractor
+from lc_classifier.features import ZTFLightcurvePreprocessor, ZTFFeatureExtractor
 
-from pandas.io.json import json_normalize
 from sqlalchemy.sql.expression import bindparam
+
+from functools import lru_cache
+from typing import List
+
 
 warnings.filterwarnings("ignore")
 logging.getLogger("GP").setLevel(logging.WARNING)
@@ -36,16 +38,17 @@ class FeaturesComputer(GenericStep):
         consumer=None,
         config=None,
         preprocessor=None,
-        features_computer=None,
+        feature_extractor=None,
         db_connection=None,
         producer=None,
         level=logging.INFO,
         **step_args,
     ):
         super().__init__(consumer, config=config, level=level)
-        self.preprocessor = preprocessor  # Not used
-        self.features_computer = (
-            features_computer or CustomStreamHierarchicalExtractor()
+        self.preprocessor = (
+                preprocessor or ZTFLightcurvePreprocessor(stream=True))
+        self.feature_extractor = (
+                feature_extractor or ZTFFeatureExtractor(bands=(1, 2), stream=True)
         )
         self.db = db_connection or SQLConnection()
         self.db.connect(self.config["DB_CONFIG"]["SQL"])
@@ -66,7 +69,12 @@ class FeaturesComputer(GenericStep):
             date=datetime.datetime.now(),
         )
 
-    def compute_features(self, detections, non_detections, metadata, xmatches):
+    def compute_features(
+            self,
+            detections: pd.DataFrame,
+            non_detections: pd.DataFrame,
+            metadata: pd.DataFrame,
+            xmatches: pd.DataFrame) -> pd.DataFrame:
         """Compute Hierarchical-Features in detections and non detections to `dict`.
 
         **Example:**
@@ -82,22 +90,27 @@ class FeaturesComputer(GenericStep):
         xmatches : pandas.DataFrame
             Xmatches data from xmatch step
         """
-        features = self.features_computer.compute_features(
+        detections = self.preprocessor.preprocess(detections)
+        non_detections = self.preprocessor.rename_columns_non_detections(
+            non_detections)
+
+        features = self.feature_extractor.compute_features(
             detections,
             non_detections=non_detections,
             metadata=metadata,
-            xmatches=xmatches,
-        )
+            xmatches=xmatches)
         features.replace([np.inf, -np.inf], np.nan, inplace=True)
         features = features.astype(float)
         return features
 
+    @lru_cache(200)
     def get_fid(self, feature):
         """
         Gets the band number (fid) of a feature.
-        Most features include the fid in the name as a sufix after '_' (underscore) character.
-        Some features don't include the fid in their name but are known to be asociated with a specific band or multiband.
-        This method considers all of these cases and the possible return values are:
+        Most features include the fid in the name as a suffix after '_' (underscore) character.
+        Some features don't include the fid in their name but are known to be
+        associated with a specific band or multiband. This method considers all
+        of these cases and the possible return values are:
 
         - 0: for wise features and sgscore
         - 12: for multiband features or power_rate
@@ -112,8 +125,8 @@ class FeaturesComputer(GenericStep):
         """
         if not isinstance(feature, str):
             self.logger.error(
-                f"Feature {feature} is not a valid feature. Should be str instance with fid after underscore (_)"
-            )
+                "Feature %s is not a valid feature. Should be "
+                "str instance with fid after underscore (_)", feature)
             return -99
         fid0 = [
             "W1",
@@ -172,7 +185,7 @@ class FeaturesComputer(GenericStep):
     def update_db(self, to_update, out_columns, apply_get_fid):
         if len(to_update) == 0:
             return
-        self.logger.info(f"Updating {len(to_update)} features")
+        self.logger.info("Updating %d features", len(to_update))
         to_update.replace({np.nan: None}, inplace=True)
         to_update = to_update.stack(dropna=False)
         to_update = to_update.to_frame()
@@ -208,7 +221,7 @@ class FeaturesComputer(GenericStep):
     def insert_db(self, to_insert, out_columns, apply_get_fid):
         if len(to_insert) == 0:
             return
-        self.logger.info(f"Inserting {len(to_insert)} new features")
+        self.logger.info("Inserting %d new features", len(to_insert))
         to_insert.replace({np.nan: None}, inplace=True)
         to_insert = to_insert.stack(dropna=False)
         to_insert = to_insert.to_frame()
@@ -221,6 +234,7 @@ class FeaturesComputer(GenericStep):
         self.db.query().bulk_insert(dict_to_insert, Feature)
         return dict_to_insert
 
+    @lru_cache(200)
     def check_feature_name(self, name):
         fid = name.rsplit("_", 1)[-1]
         if fid.isdigit():
@@ -228,7 +242,7 @@ class FeaturesComputer(GenericStep):
         else:
             return name
 
-    def add_to_db(self, result):
+    def add_to_db(self, result: pd.DataFrame):
         """Insert the `dict` result in database.
         Consider:
             - object: Refer with oid
@@ -239,7 +253,7 @@ class FeaturesComputer(GenericStep):
 
         Parameters
         ----------
-        result : dict
+        result : pd.DataFrame
             Result of features compute
         """
         out_columns = ["oid", "name", "value"]
@@ -283,18 +297,24 @@ class FeaturesComputer(GenericStep):
             }
         else:
             xmatch_values = {"W1mag": np.nan, "W2mag": np.nan, "W3mag": np.nan}
-        return {"oid": message["oid"], "candid": message["candid"], **xmatch_values}
+        return {
+            "oid": message["oid"],
+            "candid": message["candid"],
+            **xmatch_values}
 
     def delete_duplicate_detections(self, detections):
-        self.logger.debug(f"Before Dropping: {len(detections)} Detections")
+        self.logger.debug("Before Dropping: %d Detections", len(detections))
         detections.drop_duplicates(["oid", "candid"], inplace=True)
-        self.logger.debug(f"After Dropping: {len(detections)} Detections")
+        self.logger.debug("After Dropping: %d Detections", len(detections))
 
     def delete_duplicate_non_detections(self, non_detections):
-        self.logger.debug(f"Before Dropping: {len(non_detections)} Non Detections")
+        self.logger.debug(
+            "Before Dropping: %d Non Detections", len(non_detections))
         non_detections["round_mjd"] = non_detections.mjd.round(6)
-        non_detections.drop_duplicates(["oid", "round_mjd", "fid"], inplace=True)
-        self.logger.debug(f"After Dropping: {len(non_detections)} Non Detections")
+        non_detections.drop_duplicates(
+            ["oid", "round_mjd", "fid"], inplace=True)
+        self.logger.debug(
+            "After Dropping: %d Non Detections", len(non_detections))
 
     def delete_duplicates(self, detections, non_detections):
         self.delete_duplicate_detections(detections)
@@ -323,8 +343,8 @@ class FeaturesComputer(GenericStep):
             pd.DataFrame(xmatches),
         )
 
-    def execute(self, messages):
-        self.logger.info(f"Processing {len(messages)} messages.")
+    def execute(self, messages: List[dict]):
+        self.logger.info("Processing %d messages.", len(messages))
 
         preprocess_id = messages[0]["preprocess_step_id"]
         self.insert_feature_version(preprocess_id)
@@ -332,15 +352,17 @@ class FeaturesComputer(GenericStep):
         self.logger.info("Getting batch alert data")
         alert_data = pd.DataFrame(
             [
-                {"oid": message.get("oid"), "candid": message.get("candid", np.nan)}
+                {
+                    "oid": message.get("oid"),
+                    "candid": message.get("candid", np.nan)
+                }
                 for message in messages
             ]
         )
         unique_oid = len(alert_data.oid.unique())
-        self.logger.info(f"Found {unique_oid} Objects.")
+        self.logger.info("Found %d Objects.", unique_oid)
 
         self.logger.info("Getting detections and non_detections")
-
         detections, non_detections, metadata, xmatches = self.get_data_from_messages(
             messages
         )
@@ -348,15 +370,16 @@ class FeaturesComputer(GenericStep):
         if unique_oid < len(messages):
             self.delete_duplicates(detections, non_detections)
 
-        if len(detections):
+        if len(detections) > 0:
             detections.set_index("oid", inplace=True)
-        if len(non_detections):
+        if len(non_detections) > 0:
             non_detections.set_index("oid", inplace=True)
 
         self.logger.info(f"Calculating features")
-        features = self.compute_features(detections, non_detections, metadata, xmatches)
+        features = self.compute_features(
+            detections, non_detections, metadata, xmatches)
 
-        self.logger.info(f"Features calculated: {features.shape}")
+        self.logger.info("Features calculated: %s", features.shape)
         if len(features) > 0:
             self.add_to_db(features)
         if self.producer:

@@ -1,17 +1,15 @@
 import unittest
-import datetime
 from unittest import mock
 from features.step import (
     FeaturesComputer,
-    CustomStreamHierarchicalExtractor,
+    ZTFFeatureExtractor,
     SQLConnection,
     KafkaProducer,
-    pd,
-    np,
     Feature,
     FeatureVersion,
 )
-from db_plugins.db.sql import SQLQuery
+import numpy as np
+import pandas as pd
 import os
 
 FILE_PATH = os.path.dirname(__file__)
@@ -42,40 +40,69 @@ class StepTestCase(unittest.TestCase):
         self.mock_database_connection = mock.create_autospec(SQLConnection)
         self.mock_database_connection.engine = mock.Mock()
         self.mock_database_connection.session = mock.create_autospec(MockSession)
-        self.mock_custom_hierarchical_extractor = mock.create_autospec(
-            CustomStreamHierarchicalExtractor
-        )
+        self.ztf_feature_extractor = ZTFFeatureExtractor(
+            bands=(1, 2), stream=True)
         self.mock_producer = mock.create_autospec(KafkaProducer)
         self.step = FeaturesComputer(
             config=self.step_config,
-            features_computer=self.mock_custom_hierarchical_extractor,
+            feature_extractor=self.ztf_feature_extractor,
             db_connection=self.mock_database_connection,
             producer=self.mock_producer,
             test_mode=True,
         )
+
+        self.detections = pd.read_csv(
+            os.path.join(
+                FILE_PATH, '../examples/100_objects_detections_corr.csv'),
+            index_col="objectId")
+        self.detections['corrected'] = True
+        self.detections.index.name = 'oid'
+
+        self.non_detections = pd.read_csv(
+            os.path.join(
+                FILE_PATH, '../examples/100_objects_non_detections.csv'),
+            index_col="objectId")
+        self.non_detections["mjd"] = self.non_detections.jd - 2400000.5
+        self.non_detections.index.name = 'oid'
+
+        self.xmatches = self.mock_xmatches(self.detections)
+        self.metadata = self.mock_metadata(self.detections)
+
+    def mock_xmatches(self, detections):
+        oids = detections.index.unique()
+        xmatches = pd.DataFrame(
+            data=oids.values.reshape([-1, 1]),
+            columns=['oid']
+        )
+        xmatches['W1mag'] = np.random.randn(len(oids)) + 17.0
+        xmatches['W2mag'] = np.random.randn(len(oids)) + 17.0
+        xmatches['W3mag'] = np.random.randn(len(oids)) + 17.0
+        return xmatches
+
+    def mock_metadata(self, detections):
+        oids = detections.index.values
+        metadata = pd.DataFrame(
+            data=oids.reshape([-1, 1]),
+            columns=['oid']
+        )
+        candid = [oid + '_' + str(i) for oid, i in zip(oids, range(len(oids)))]
+        metadata['candid'] = candid
+        metadata['sgscore1'] = np.random.rand(len(oids))
+        return metadata
 
     def test_insert_step_metadata(self):
         self.step.insert_step_metadata()
         self.mock_database_connection.query().get_or_create.assert_called_once()
 
     def test_compute_features(self):
-        detections = pd.DataFrame()
-        non_detections = pd.DataFrame()
-        metadata = pd.DataFrame()
-        xmatches = pd.DataFrame()
-        self.mock_custom_hierarchical_extractor.compute_features.return_value = (
-            pd.DataFrame()
+        step_features = self.step.compute_features(
+            self.detections,
+            self.non_detections,
+            self.metadata,
+            self.xmatches
         )
-        features = self.step.compute_features(
-            detections, non_detections, metadata, xmatches
-        )
-        self.mock_custom_hierarchical_extractor.compute_features.assert_called_with(
-            detections,
-            non_detections=non_detections,
-            metadata=metadata,
-            xmatches=xmatches,
-        )
-        self.assertIsInstance(features, pd.DataFrame)
+        self.assertIsInstance(step_features, pd.DataFrame)
+        self.assertEqual(97, len(step_features))
 
     @mock.patch.object(pd, "read_sql")
     def test_get_on_db(self, read_sql):
