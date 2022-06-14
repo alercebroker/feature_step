@@ -5,18 +5,6 @@ import os
 from schema import SCHEMA
 
 FEATURE_VERSION = os.environ["FEATURE_VERSION"]
-STEP_VERSION = os.environ["STEP_VERSION"]
-
-DB_CONFIG = {
-    "SQL": {
-        "ENGINE": os.environ["DB_ENGINE"],
-        "HOST": os.environ["DB_HOST"],
-        "USER": os.environ["DB_USER"],
-        "PASSWORD": os.environ["DB_PASSWORD"],
-        "PORT": int(os.environ["DB_PORT"]),
-        "DB_NAME": os.environ["DB_NAME"],
-    }
-}
 
 CONSUMER_CONFIG = {
     "TOPICS": os.environ["CONSUMER_TOPICS"].strip().split(","),
@@ -28,7 +16,7 @@ CONSUMER_CONFIG = {
         "enable.partition.eof": os.getenv("ENABLE_PARTITION_EOF", False),
     },
     "consume.timeout": int(os.getenv("CONSUME_TIMEOUT", 10)),
-    "consume.messages": int(os.getenv("CONSUME_MESSAGES", 1000)),
+    "consume.messages": int(os.getenv("CONSUME_MESSAGES", 100)),
 }
 
 PRODUCER_CONFIG = {
@@ -96,7 +84,6 @@ STEP_METADATA = {
 
 STEP_CONFIG = {
     "CONSUMER_CONFIG": CONSUMER_CONFIG,
-    "DB_CONFIG": DB_CONFIG,
     "PRODUCER_CONFIG": PRODUCER_CONFIG,
     "METRICS_CONFIG": METRICS_CONFIG,
     "STEP_METADATA": STEP_METADATA,
