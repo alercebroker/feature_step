@@ -24,6 +24,7 @@ SCHEMA = {
     "type": "record",
     "fields": [
      {"name": "aid", "type": "string"},
+     {"name": "alertId", "type": "string"},
      {"name": "candid", "type": "long"},
      {"name": "features", "type": [FEATURES, "null"]},
      {"name": "detections", "type": LIGHTCURVE}
