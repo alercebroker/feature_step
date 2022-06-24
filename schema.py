@@ -28,7 +28,7 @@ SCHEMA = {
         {"name": "candid", "type": "long"},
         {"name": "features", "type": [FEATURES, "null"]},
         {"name": "detections", "type": LIGHTCURVE},
-        {"name": "elasticcPublishTimestamp", "type": "long"},
-        {"name": "brokerIngestTimestamp", "type": "long"},
+        {"name": "elasticcPublishTimestamp", "type": {"type": "long", "logicalType": "timestamp-millis"}},
+        {"name": "brokerIngestTimestamp", "type": {"type": "long", "logicalType": "timestamp-millis"}}
     ],
 }
