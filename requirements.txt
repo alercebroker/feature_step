@@ -5,5 +5,5 @@ apf-base==1.0.7
 -e git+https://github.com/alercebroker/mhps.git#egg=mhps
 -e git+https://github.com/alercebroker/turbo-fats.git#egg=turbofats
 -e git+https://github.com/alercebroker/db-plugins.git#egg=db_plugins
--e git+https://github.com/alercebroker/lc_classifier.git@elasticc#egg=lc_classifier
+-e git+https://github.com/alercebroker/lc_classifier.git@elasticc-1.0.0#egg=lc_classifier
 -e git+https://github.com/alercebroker/P4J.git#egg=P4J
