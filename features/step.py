@@ -19,8 +19,6 @@ class FeaturesComputer(GenericStep):
     ----------
     consumer : GenericConsumer
         Description of parameter `consumer`.
-    **step_args : type
-        Other args passed to step (DB connections, API requests, etc.)
 
     """
 
@@ -30,7 +28,6 @@ class FeaturesComputer(GenericStep):
         config=None,
         producer=None,
         level=logging.INFO,
-        **step_args,
     ):
         super().__init__(consumer, config=config, level=level)
         self.preprocessor = ElasticcPreprocessor()
@@ -88,7 +85,8 @@ class FeaturesComputer(GenericStep):
         detections["BAND"] = detections["BAND"].map(lambda x: self._fid_mapper[x])
         return detections
 
-    def get_metadata(self, light_curves: pd.DataFrame):
+    @classmethod
+    def get_metadata(cls, light_curves: pd.DataFrame):
         def _get_metadata(detections: pd.DataFrame):
             metadata = {
                 "MWEBV": np.nan,
@@ -109,7 +107,8 @@ class FeaturesComputer(GenericStep):
         metadata_df = light_curves["detections"].apply(_get_metadata)
         return metadata_df
 
-    def prepare_message(self, features, light_curves):
+    @ classmethod
+    def prepare_message(cls, features, light_curves):
         features.replace({np.nan: None}, inplace=True)
         features_pack = pd.DataFrame({"features": features.to_dict("records")}, index=features.index)
         output_df = light_curves.join(features_pack)
