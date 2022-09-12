@@ -77,13 +77,29 @@ class FeaturesComputer(GenericStep):
             self.producer.produce(message, key=aid)
 
     def map_detections(self, light_curves: pd.DataFrame) -> pd.DataFrame:
-        light_curves.drop(columns=["meanra", "meandec", "ndet", "non_detections", "metadata"], inplace=True)
+        light_curves = light_curves.drop(columns=["meanra", "meandec", "ndet", "metadata", "non_detections"])
         exploded = light_curves.explode("detections")
         detections = pd.DataFrame.from_records(exploded["detections"].values, index=exploded.index)
         detections = detections[self._rename_cols.keys()]
         detections = detections.rename(columns=self._rename_cols)
         detections["BAND"] = detections["BAND"].map(lambda x: self._fid_mapper[x])
         return detections
+
+    def map_forced_phot(self, light_curves: pd.DataFrame) -> pd.DataFrame:
+        light_curves = light_curves.drop(columns=["meanra", "meandec", "ndet", "metadata", "detections"])
+        exploded = light_curves.explode("non_detections")
+        exploded = exploded[~exploded["non_detections"].isna()]
+
+        if exploded.empty:
+            return pd.DataFrame(columns=list(self._rename_cols.keys()))
+
+        forced_phot = pd.DataFrame.from_records(exploded["non_detections"].values, index=exploded.index)
+        forced_phot["e_mag"] = forced_phot["extra_fields"].map(lambda x: x["psFluxErr"])
+        forced_phot.rename(columns={"diffmaglim": "mag"}, inplace=True)
+        forced_phot = forced_phot[self._rename_cols.keys()]
+        forced_phot = forced_phot.rename(columns=self._rename_cols)
+        forced_phot["BAND"] = forced_phot["BAND"].map(lambda x: self._fid_mapper[x])
+        return forced_phot
 
     @classmethod
     def get_metadata(cls, light_curves: pd.DataFrame):
@@ -125,6 +141,10 @@ class FeaturesComputer(GenericStep):
         self.logger.info(f"Processing {len(messages)} light curves.")
         detections = self.map_detections(light_curves_dataframe)
         self.logger.info(f"A total of {len(detections)} detections in {len(light_curves_dataframe)} light curves")
+        forced_phot = self.map_forced_phot(light_curves_dataframe)
+        self.logger.info(
+            f"A total of {len(forced_phot)} forced photometry in {len(light_curves_dataframe)} light curves")
+        detections = pd.concat([detections, forced_phot])
         metadata = self.get_metadata(light_curves_dataframe)
         features = self.compute_features(detections, metadata)
         self.logger.info(f"Features calculated: {len(features)}")
