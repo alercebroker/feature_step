@@ -130,6 +130,7 @@ class FeaturesComputer(GenericStep):
         output_df = light_curves.join(features_pack)
         output_df.reset_index(inplace=True, drop=False)
         output_df["candid"] = output_df["candid"].astype(int)
+        output_df = output_df[~output_df["features"].isna()]
         output_df.replace({np.nan: None}, inplace=True)
         output_messages = output_df.to_dict("records")
         return output_messages
