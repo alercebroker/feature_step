@@ -94,6 +94,7 @@ class FeaturesComputer(GenericStep):
             return pd.DataFrame(columns=list(self._rename_cols.keys()))
 
         forced_phot = pd.DataFrame.from_records(exploded["non_detections"].values, index=exploded.index)
+        forced_phot.drop_duplicates(["oid", "mjd", "fid"], inplace=True)
         forced_phot["e_mag"] = forced_phot["extra_fields"].map(lambda x: x["psFluxErr"])
         forced_phot.rename(columns={"diffmaglim": "mag"}, inplace=True)
         forced_phot = forced_phot[self._rename_cols.keys()]
