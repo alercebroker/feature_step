@@ -82,9 +82,7 @@ class BaseHandler(abc.ABC):
 
         if self.UNIQUE:
             self._alerts.drop_duplicates(self.UNIQUE, inplace=True)
-            self.logger.debug(
-                f"{len(self._alerts)} {self._NAME} remain after duplicate removal"
-            )
+            self.logger.debug(f"{len(self._alerts)} {self._NAME} remain after duplicate removal")
         if self.INDEX:
             self._alerts.drop_duplicates(self.INDEX, inplace=True)
             self._alerts.set_index(self.INDEX, inplace=True)
@@ -108,20 +106,10 @@ class BaseHandler(abc.ABC):
             return
         self.clear_caches()
         if by_fid:
-            self.logger.debug(
-                f"Selecting objects with more than {minimum} {self._NAME} in total"
-            )
-            mask = (
-                self._alerts.groupby("id")["fid"]
-                .value_counts()
-                .unstack("fid")
-                .max(axis="columns")
-                > minimum
-            )
+            self.logger.debug(f"Selecting objects with more than {minimum} {self._NAME} in total")
+            mask = self._alerts.groupby("id")["fid"].value_counts().unstack("fid").max(axis="columns") > minimum
         else:
-            self.logger.debug(
-                f"Selecting objects with more than {minimum} {self._NAME} in at least one band"
-            )
+            self.logger.debug(f"Selecting objects with more than {minimum} {self._NAME} in at least one band")
             mask = self._alerts.groupby("id")["fid"].count() > minimum
         self._alerts = self._alerts[self._alerts["id"].isin(mask.index[mask])]
         self.logger.debug(f"{self.ids().size} objects remain after selection")
@@ -135,9 +123,7 @@ class BaseHandler(abc.ABC):
             other: Handler used to check for objects
         """
         self.clear_caches()
-        self.logger.debug(
-            f"Selecting objects present in {other.__class__.__name__} instance"
-        )
+        self.logger.debug(f"Selecting objects present in {other.__class__.__name__} instance")
         self._alerts = self._alerts[self._alerts["id"].isin(other.ids())]
         self.logger.debug(f"{self.ids().size} objects remain after selection")
 
@@ -191,9 +177,7 @@ class BaseHandler(abc.ABC):
             self.__add_extra_fields(kwargs.pop("alerts"), kwargs.pop("extras"))
         if set(kwargs) - {"alerts", "surveys"}:
             # Only used in subclasses, when using super it should be empty
-            raise ValueError(
-                f"Unrecognized kwargs: {', '.join(set(kwargs) - {'alerts', 'surveys'})}"
-            )
+            raise ValueError(f"Unrecognized kwargs: {', '.join(set(kwargs) - {'alerts', 'surveys'})}")
 
     def _clear(
         self,
@@ -225,19 +209,13 @@ class BaseHandler(abc.ABC):
         Args:
             extras: List of additional fields to keep for the alerts
         """
-        self.logger.debug(
-            f"Selecting valid {self._NAME} (i.e., no undefined values in {self.COLUMNS})"
-        )
+        self.logger.debug(f"Selecting valid {self._NAME} (i.e., no undefined values in {self.COLUMNS})")
         with pd.option_context("mode.use_inf_as_na", True):
-            self._alerts = self._alerts[
-                self._alerts[self.COLUMNS].notna().all(axis="columns")
-            ]
+            self._alerts = self._alerts[self._alerts[self.COLUMNS].notna().all(axis="columns")]
         self.logger.debug(f"{len(self._alerts)} {self._NAME} remain after selection")
 
         index = (self.INDEX,) if isinstance(self.INDEX, str) else self.INDEX
-        self._alerts = self._alerts[
-            [c for c in set(self.COLUMNS + extras) if c not in index]
-        ]
+        self._alerts = self._alerts[[c for c in set(self.COLUMNS + extras) if c not in index]]
 
     def __discard_not_in_surveys(self, surveys: str | tuple[str]):
         """Keep only alerts in given survey(s). Based on field `sid`.
@@ -245,9 +223,7 @@ class BaseHandler(abc.ABC):
         Args:
             surveys: Surveys to select. Empty tuple will select all
         """
-        self.logger.debug(
-            f"Selecting {self._NAME} from survey(s): {surveys if surveys else 'all'}"
-        )
+        self.logger.debug(f"Selecting {self._NAME} from survey(s): {surveys if surveys else 'all'}")
         self._alerts = self._alerts[self._surveys_mask(surveys)]
         self.logger.debug(f"{len(self._alerts)} {self._NAME} remain after selection")
 
@@ -257,9 +233,7 @@ class BaseHandler(abc.ABC):
         Args:
             bands: Bands to select. Empty tuple will select all
         """
-        self.logger.debug(
-            f"Selecting {self._NAME} from band(s): {bands if bands else 'all'}"
-        )
+        self.logger.debug(f"Selecting {self._NAME} from band(s): {bands if bands else 'all'}")
         self._alerts = self._alerts[self._bands_mask(bands)]
         self.logger.debug(f"{len(self._alerts)} {self._NAME} remain after selection")
 
@@ -275,19 +249,11 @@ class BaseHandler(abc.ABC):
             alerts: Original alerts
             extras: List with additional fields
         """
-        extras = [
-            extra
-            for extra in extras
-            if extra not in self.COLUMNS and extra not in self._alerts.columns
-        ]
+        extras = [extra for extra in extras if extra not in self.COLUMNS and extra not in self._alerts.columns]
         if extras and self._alerts.size:
             records = {alert[self.INDEX]: alert["extra_fields"] for alert in alerts}
             df = pd.DataFrame.from_dict(records, orient="index", columns=extras)
-            df = (
-                df.reset_index(names=[self.INDEX])
-                .drop_duplicates(self.INDEX)
-                .set_index(self.INDEX)
-            )
+            df = df.reset_index(names=[self.INDEX]).drop_duplicates(self.INDEX).set_index(self.INDEX)
             self._alerts = self._alerts.join(df)
         elif extras:  # Add extra (empty) columns to empty dataframe
             self._alerts[[extras]] = None
@@ -393,9 +359,7 @@ class BaseHandler(abc.ABC):
         Returns:
             DataFrameGroupBy: Grouped detections
         """
-        return self.alerts(surveys=surveys, bands=bands, flag=flag).groupby(
-            ["id", "fid"] if by_fid else "id"
-        )
+        return self.alerts(surveys=surveys, bands=bands, flag=flag).groupby(["id", "fid"] if by_fid else "id")
 
     @methodtools.lru_cache()
     def which_index(
@@ -420,13 +384,9 @@ class BaseHandler(abc.ABC):
             pd.Series: First or last alert index. Indexed by `id` (and `fid` if `by_fid`).
         """
         if which not in ("first", "last"):
-            raise ValueError(
-                f"Unrecognized value for 'which': {which} (can only be first or last)"
-            )
+            raise ValueError(f"Unrecognized value for 'which': {which} (can only be first or last)")
         function = "idxmin" if which == "first" else "idxmax"
-        return self.agg(
-            "mjd", function, by_fid=by_fid, surveys=surveys, bands=bands, flag=flag
-        )
+        return self.agg("mjd", function, by_fid=by_fid, surveys=surveys, bands=bands, flag=flag)
 
     def which_value(
         self,
@@ -451,9 +411,7 @@ class BaseHandler(abc.ABC):
         Returns:
             pd.Series: First or last field value. Indexed by `id` (and `fid` if `by_fid`).
         """
-        idx = self.which_index(
-            which=which, by_fid=by_fid, surveys=surveys, bands=bands, flag=flag
-        )
+        idx = self.which_index(which=which, by_fid=by_fid, surveys=surveys, bands=bands, flag=flag)
         df = self.alerts(surveys=surveys, bands=bands, flag=flag)
         return df[column][idx].set_axis(idx.index)
 
@@ -483,9 +441,7 @@ class BaseHandler(abc.ABC):
         Returns:
             pd.Series: Aggregate field value. Indexed by `id` (and `fid` if `by_fid`).
         """
-        return self.grouped(by_fid=by_fid, surveys=surveys, bands=bands, flag=flag)[
-            column
-        ].agg(func, **kwargs)
+        return self.grouped(by_fid=by_fid, surveys=surveys, bands=bands, flag=flag)[column].agg(func, **kwargs)
 
     @methodtools.lru_cache()
     def get_delta(
@@ -509,12 +465,8 @@ class BaseHandler(abc.ABC):
         Returns:
             pd.Series: Field value difference. Indexed by `id` (and `fid` if `by_fid`).
         """
-        vmax = self.agg(
-            column, "max", by_fid=by_fid, surveys=surveys, bands=bands, flag=flag
-        )
-        vmin = self.agg(
-            column, "min", by_fid=by_fid, surveys=surveys, bands=bands, flag=flag
-        )
+        vmax = self.agg(column, "max", by_fid=by_fid, surveys=surveys, bands=bands, flag=flag)
+        vmin = self.agg(column, "min", by_fid=by_fid, surveys=surveys, bands=bands, flag=flag)
         return vmax - vmin
 
     def apply(
@@ -540,6 +492,4 @@ class BaseHandler(abc.ABC):
         Returns:
             pd.DataFrame: Results of `func`. Indexed by `id` (and `fid` if `by_fid`).
         """
-        return self.grouped(
-            by_fid=by_fid, surveys=surveys, bands=bands, flag=flag
-        ).apply(func, **kwargs)
+        return self.grouped(by_fid=by_fid, surveys=surveys, bands=bands, flag=flag).apply(func, **kwargs)

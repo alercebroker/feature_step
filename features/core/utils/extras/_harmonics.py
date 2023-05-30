@@ -14,9 +14,7 @@ def _indices(n: int) -> list[str]:
     def with_i(which, i):
         return f"{fmt.format(which)}_{i}"
 
-    index = [with_i("mag", i + 1) for i in range(n)] + [
-        with_i("phase", i + 1) for i in range(1, n)
-    ]
+    index = [with_i("mag", i + 1) for i in range(n)] + [with_i("phase", i + 1) for i in range(1, n)]
     return index + [fmt.format("mse")]
 
 
@@ -55,9 +53,7 @@ def harmonics(df: pd.DataFrame, n: int, period: float) -> pd.Series:
     return pd.Series(np.hstack([mod, phi, [mse]]), index=_indices(n))
 
 
-def apply_harmonics(
-    df: pd.DataFrame, n: int, period: float, fids: tuple[str, ...]
-) -> pd.Series:
+def apply_harmonics(df: pd.DataFrame, n: int, period: float, fids: tuple[str, ...]) -> pd.Series:
     """Computes the harmonic features for a given object.
 
     There will be `n` norms, `n-1` phases and one `mse` (mean standard error) per band.

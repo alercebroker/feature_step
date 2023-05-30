@@ -51,16 +51,12 @@ class ZTFFeatureExtractor(BaseFeatureExtractor):
     ):
         if kwargs.pop("legacy", False):
             metadata = kwargs.pop("metadata", None)
-            detections, non_detections, xmatches = self._legacy(
-                detections, non_detections, xmatches, metadata
-            )
+            detections, non_detections, xmatches = self._legacy(detections, non_detections, xmatches, metadata)
 
         super().__init__(detections, non_detections, xmatches)
 
         # Change isdiffpos from 1 or -1 to True or False
-        self.detections.add_field(
-            "isdiffpos", self.detections.alerts()["isdiffpos"] > 0
-        )
+        self.detections.add_field("isdiffpos", self.detections.alerts()["isdiffpos"] > 0)
 
     @classmethod
     def _legacy(cls, detections, non_detections, xmatches, metadata):
@@ -76,9 +72,7 @@ class ZTFFeatureExtractor(BaseFeatureExtractor):
             detections = detections.assign(sgscore1=metadata["sgscore1"])
         detections = detections.reset_index()
         detections["sid"] = "ZTF"
-        detections["fid"].replace(
-            {v: k for k, v in cls.BANDS_MAPPING.items()}, inplace=True
-        )  # reverse mapping
+        detections["fid"].replace({v: k for k, v in cls.BANDS_MAPPING.items()}, inplace=True)  # reverse mapping
         detections = detections.rename(
             columns={
                 "oid": "aid",
@@ -92,9 +86,7 @@ class ZTFFeatureExtractor(BaseFeatureExtractor):
         if isinstance(non_detections, pd.DataFrame):
             non_detections = non_detections.reset_index()
             non_detections["sid"] = "ZTF"
-            non_detections["fid"].replace(
-                {v: k for k, v in cls.BANDS_MAPPING.items()}, inplace=True
-            )
+            non_detections["fid"].replace({v: k for k, v in cls.BANDS_MAPPING.items()}, inplace=True)
             non_detections = non_detections.rename(columns={"oid": "aid"})
 
         if isinstance(xmatches, pd.DataFrame):
@@ -105,21 +97,13 @@ class ZTFFeatureExtractor(BaseFeatureExtractor):
 
     def _discard_detections(self):
         """Include only alerts with a minimum real-bogus value and a maximum error in magnitude"""
-        self.logger.debug(
-            f"Selecting detections with real/bogus score greater than {self.MIN_REAL_BOGUS}"
-        )
+        self.logger.debug(f"Selecting detections with real/bogus score greater than {self.MIN_REAL_BOGUS}")
         self.detections.select("rb", gt=self.MIN_REAL_BOGUS)
-        self.logger.debug(
-            f"{len(self.detections.alerts())} detections remain after selection"
-        )
+        self.logger.debug(f"{len(self.detections.alerts())} detections remain after selection")
 
-        self.logger.debug(
-            f"Selecting detections with magnitude error lower than {self.MAX_ERROR}"
-        )
+        self.logger.debug(f"Selecting detections with magnitude error lower than {self.MAX_ERROR}")
         self.detections.select("e_mag_ml", gt=0, lt=self.MAX_ERROR)
-        self.logger.debug(
-            f"{len(self.detections.alerts())} detections remain after selection"
-        )
+        self.logger.debug(f"{len(self.detections.alerts())} detections remain after selection")
         super()._discard_detections()
 
     @decorators.logger
@@ -133,15 +117,9 @@ class ZTFFeatureExtractor(BaseFeatureExtractor):
     @decorators.add_fid("gr")
     def calculate_colors(self) -> pd.DataFrame:
         gr_max = self.detections.get_colors("min", ("g", "r"), ml=False, flux=self.FLUX)
-        gr_max_corr = self.detections.get_colors(
-            "min", ("g", "r"), ml=True, flux=self.FLUX
-        )
-        gr_mean = self.detections.get_colors(
-            "mean", ("g", "r"), ml=False, flux=self.FLUX
-        )
-        gr_mean_corr = self.detections.get_colors(
-            "mean", ("g", "r"), ml=True, flux=self.FLUX
-        )
+        gr_max_corr = self.detections.get_colors("min", ("g", "r"), ml=True, flux=self.FLUX)
+        gr_mean = self.detections.get_colors("mean", ("g", "r"), ml=False, flux=self.FLUX)
+        gr_mean_corr = self.detections.get_colors("mean", ("g", "r"), ml=True, flux=self.FLUX)
         return pd.DataFrame(
             {
                 "g-r_max": gr_max,
@@ -156,9 +134,7 @@ class ZTFFeatureExtractor(BaseFeatureExtractor):
     def calculate_wise_colors(self) -> pd.DataFrame:
         if self.FLUX:
             raise ValueError("Cannot calculate WISE colors with flux.")
-        mags = functions.fill_index(
-            self.detections.agg("mag_ml", "mean", by_fid=True), fid=("g", "r")
-        )
+        mags = functions.fill_index(self.detections.agg("mag_ml", "mean", by_fid=True), fid=("g", "r"))
         g, r = mags.xs("g", level="fid"), mags.xs("r", level="fid")
         return pd.DataFrame(
             {
@@ -204,12 +180,8 @@ class ZTFFeatureExtractor(BaseFeatureExtractor):
         n_neg = n_det - n_pos
         positive_fraction = n_pos / n_det
 
-        n_non_det_before = self.non_detections.agg_when(
-            "mjd", "count", when="before", by_fid=True
-        )
-        n_non_det_after = self.non_detections.agg_when(
-            "mjd", "count", when="after", by_fid=True
-        )
+        n_non_det_before = self.non_detections.agg_when("mjd", "count", when="before", by_fid=True)
+        n_non_det_after = self.non_detections.agg_when("mjd", "count", when="after", by_fid=True)
 
         delta_mjd = self.detections.get_delta("mjd", by_fid=True)
         delta_mag = self.detections.get_delta("mag_ml", by_fid=True)
@@ -217,24 +189,12 @@ class ZTFFeatureExtractor(BaseFeatureExtractor):
         mean_mag = self.detections.agg("mag_ml", "mean", by_fid=True)
         first_mag = self.detections.which_value("mag_ml", which="first", by_fid=True)
 
-        max_upper_before = self.non_detections.agg_when(
-            "diffmaglim", "max", when="before", by_fid=True
-        )
-        max_upper_after = self.non_detections.agg_when(
-            "diffmaglim", "max", when="after", by_fid=True
-        )
-        median_upper_before = self.non_detections.agg_when(
-            "diffmaglim", "median", when="before", by_fid=True
-        )
-        median_upper_after = self.non_detections.agg_when(
-            "diffmaglim", "median", when="after", by_fid=True
-        )
-        last_mjd_before = self.non_detections.agg_when(
-            "mjd", "max", when="after", by_fid=True
-        )
-        last_upper_before = self.non_detections.which_value_when(
-            "diffmaglim", which="last", when="after", by_fid=True
-        )
+        max_upper_before = self.non_detections.agg_when("diffmaglim", "max", when="before", by_fid=True)
+        max_upper_after = self.non_detections.agg_when("diffmaglim", "max", when="after", by_fid=True)
+        median_upper_before = self.non_detections.agg_when("diffmaglim", "median", when="before", by_fid=True)
+        median_upper_after = self.non_detections.agg_when("diffmaglim", "median", when="after", by_fid=True)
+        last_mjd_before = self.non_detections.agg_when("mjd", "max", when="after", by_fid=True)
+        last_upper_before = self.non_detections.which_value_when("diffmaglim", which="last", when="after", by_fid=True)
         dmag_non_det = median_upper_before - min_mag
         dmag_first_det = last_upper_before - first_mag
 

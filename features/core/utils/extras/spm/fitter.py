@@ -48,25 +48,17 @@ def single_band(
     func = _get_model(version)
 
     try:
-        params, *_ = optimize.curve_fit(
-            func, time, flux, p0=initial, bounds=bounds, **kwargs
-        )
+        params, *_ = optimize.curve_fit(func, time, flux, p0=initial, bounds=bounds, **kwargs)
     except (ValueError, RuntimeError, optimize.OptimizeWarning):
         try:
             kwargs.update(ftol=0.1 if alt else initial[0] / 3)
-            params, *_ = optimize.curve_fit(
-                func, time, flux, p0=initial, bounds=bounds, **kwargs
-            )
+            params, *_ = optimize.curve_fit(func, time, flux, p0=initial, bounds=bounds, **kwargs)
         except (ValueError, RuntimeError, optimize.OptimizeWarning):
             params = np.full_like(initial, np.nan)
 
     prediction = func(time, *params)
     dof = prediction.size - params.size
-    chi = (
-        np.nan
-        if dof < 1
-        else np.sum((prediction - flux) ** 2 / (error + 0.01) ** 2) / dof
-    )
+    chi = np.nan if dof < 1 else np.sum((prediction - flux) ** 2 / (error + 0.01) ** 2) / dof
     return pd.Series([*params, chi], index=_INDICES)
 
 
@@ -82,12 +74,10 @@ def multi_band(
     time = time - np.min(time)
 
     initial, bounds = guess.multi_band(time, flux, band, preferred=preferred)
-    fids, band = np.unique(
-        band, return_inverse=True
-    )  # `band` now has the fids as index of fids
+    fids, band = np.unique(band, return_inverse=True)  # `band` now has the fids as index of fids
     smooth = np.percentile(error, 10) * 0.5
 
-    weight = np.exp(-((flux + error) * ((flux + error) < 0) / (error + 1)) ** 2)
+    weight = np.exp(-(((flux + error) * ((flux + error) < 0) / (error + 1)) ** 2))
 
     # Padding is needed to minimize recompilations of jax jit functions
     time, flux, error, band, weight = _pad(time, flux, error, band, weight, mult)
@@ -97,9 +87,7 @@ def multi_band(
 
     args = (time, flux, error, band, np.arange(fids.size), smooth, weight)  # For objective function
     kwargs = dict(method="TNC", options={"maxfun": 1000})  # For minimizer
-    result = optimize.minimize(
-        obj, initial, jac=grad, args=args, bounds=bounds, **kwargs
-    )
+    result = optimize.minimize(obj, initial, jac=grad, args=args, bounds=bounds, **kwargs)
 
     n_params = 6
     params = result.x.reshape((-1, n_params))
@@ -111,20 +99,14 @@ def multi_band(
         prediction = func(time[mask], *params[i])
 
         dof = prediction.size - n_params
-        chi = (
-            np.nan
-            if dof < 1
-            else np.sum((prediction - flux[mask]) ** 2 / (error[mask] + 5) ** 2) / dof
-        )
+        chi = np.nan if dof < 1 else np.sum((prediction - flux[mask]) ** 2 / (error[mask] + 5) ** 2) / dof
         final.append(pd.Series([*params[i], chi], index=_indices_with_fid(fid)))
 
     return pd.concat(final)
 
 
 def _pad(time, flux, error, band, weight, mult=25):
-    pad = (
-        mult - time.size % mult
-    )  # All padded arrays are assumed to have the same length
+    pad = mult - time.size % mult  # All padded arrays are assumed to have the same length
     time = np.pad(time, (0, pad), "constant", constant_values=(0, 0))
     flux = np.pad(flux, (0, pad), "constant", constant_values=(0, 0))
     band = np.pad(band, (0, pad), "constant", constant_values=(0, -1))

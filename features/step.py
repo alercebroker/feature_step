@@ -32,9 +32,7 @@ class FeaturesComputer(GenericStep):
         self.scribe_producer = scribe_class(self.config["SCRIBE_PRODUCER_CONFIG"])
 
     def produce_to_scribe(self, features: pd.DataFrame):
-        commands = parse_scribe_payload(
-            features, self.features_extractor
-        )
+        commands = parse_scribe_payload(features, self.features_extractor)
 
         for command in commands:
             self.scribe_producer.produce({"payload": json.dumps(command)})
